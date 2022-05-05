@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     env,
     fmt::{Display, Formatter},
 };
@@ -369,13 +368,22 @@ pub async fn try_attach(
         ..Default::default()
     };
 
+    let custom_metric_tags_vrl = datadog.tags.clone().map_or("".to_string(), |tags| {
+        convert_tags_to_vrl(tags, Some("tags".to_string()))
+    });
+    let custom_logs_tags_vrl = datadog
+        .tags
+        .clone()
+        .map_or("".to_string(), |tags| convert_tags_to_vrl(tags, None));
+
     let tag_metrics = RemapConfig {
         source: Some(format!(
             r#"
             .tags.version = "{}"
             .tags.configuration_key = "{}"
+            {}
         "#,
-            &config_version, &datadog.configuration_key,
+            &config_version, &datadog.configuration_key, custom_metric_tags_vrl
         )),
         ..Default::default()
     };
@@ -385,8 +393,9 @@ pub async fn try_attach(
             r#"
             .version = "{}"
             .configuration_key = "{}"
+            {}
         "#,
-            &config_version, &datadog.configuration_key,
+            &config_version, &datadog.configuration_key, custom_logs_tags_vrl
         )),
         ..Default::default()
     };
@@ -579,7 +588,7 @@ async fn report_serialized_config_to_datadog<'a>(
 
 #[cfg(all(test, feature = "enterprise-tests"))]
 mod test {
-    use std::{collections::HashMap, io::Write, path::PathBuf, str::FromStr, thread};
+    use std::{io::Write, path::PathBuf, str::FromStr, thread};
 
     use http::StatusCode;
     use indexmap::IndexMap;
